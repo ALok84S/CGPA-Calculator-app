@@ -551,6 +551,8 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     
     chrome_options = Options()
     # Essential Chrome options for stability
+    # Comment out headless for debugging
+    chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
@@ -561,8 +563,7 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     chrome_options.add_argument('--ignore-certificate-errors')
     chrome_options.add_argument('--allow-running-insecure-content')
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    # Comment out headless for debugging
-    chrome_options.add_argument('--headless=new')
+    
 
     driver = None
     
@@ -1379,6 +1380,6 @@ def calculate_manual():
         return jsonify({'status': 'error', 'error': str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # app.run(debug=True)
     # For deployment, consider setting host and port explicitly:
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug= True)
