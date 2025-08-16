@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, session
+from flask_cors import CORS
 import threading
 import time
 import re
@@ -19,6 +20,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeType
 
 app = Flask(__name__)
+CORS(app)  # allow frontend on Vercel to talk to backend
 app.secret_key = os.urandom(24)
 
 # --- CGPA Calculation Functions ---
@@ -1230,6 +1232,9 @@ def update_progress(session_id, message):
     progress_data[session_id] = {'status': 'processing', 'message': message}
 
 @app.route('/')
+def home():
+    return jsonify({"message": "Backend is running ✅"})
+
 def index():
     return render_template('index.html')
 
