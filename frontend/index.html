@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRCE CGPA Calculator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px; /* Base padding for all screens */
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            width: 100%; /* Full width on small screens */
+            max-width: 500px;
+            text-align: center;
+            margin: 0 10px; /* Small margin on sides for very small screens */
+        }
+
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+            appearance: none; /* Remove default select arrow */
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            /* Corrected SVG for a downward arrow */
+            background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23764ba2%22%20d%3D%22M287%2C104.7l-140.8%2C140.8L5.4%2C104.7c-7.8-7.8-20.5-7.8-28.3%2C0s-7.8%2C20.5%2C0%2C28.3l145%2C145c3.9%2C3.9%2C8.9%2C5.9%2C14.2%2C5.9s10.3-2%2C14.2-5.9l145-145c7.8-7.8%2C7.8-20.5%2C0-28.3C307.5%2C96.9%2C294.8%2C96.9%2C287%2C104.7z%22%2F%3E%3C%2Fsvg%3E');
+            background-repeat: no-repeat;
+            background-position: right 15px top 50%;
+            background-size: 12px auto;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .processing-animation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: 600;
+            color: #764ba2;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.2);
+            border-top: 4px solid #764ba2;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .progress-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            color: white;
+        }
+
+        .cgpa-display {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .cgpa-label {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .marks-table {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .marks-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .marks-row:last-child {
+            border-bottom: none;
+        }
+
+        .subject-name {
+            font-weight: 500;
+            flex: 1;
+            text-align: left;
+        }
+
+        .subject-mark {
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+
+        .error {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            background: #ff6b6b;
+            color: white;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .manual-calc {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            display: none;
+        }
+
+        .manual-calc h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .manual-marks-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 0 5px;
+            color: #555;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .manual-marks-header .header-subject {
+            flex: 1;
+            text-align: left;
+            padding-left: 5px;
+        }
+
+        .manual-marks-header .header-marks {
+            flex: 1;
+            text-align: right;
+            padding-right: 5px;
+        }
+
+        .marks-input-grid {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .marks-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .marks-input-row label {
+            flex: 2;
+            margin-bottom: 0;
+            font-size: 13px;
+            text-align: left;
+            padding-left: 5px;
+        }
+
+        .marks-input-row input {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+        }
+
+        .toggle-manual {
+            background: none;
+            border: 2px solid #667eea;
+            color: #667eea;
+            margin-top: 15px;
+            padding: 12px;
+            font-size: 14px;
+        }
+
+        .toggle-manual:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .birthdate-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .birthdate-group .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* --- Mobile-Friendly Adjustments --- */
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 20px;
+                margin: 0;
+                border-radius: 0;
+            }
+
+            .logo {
+                width: 60px;
+                height: 60px;
+                font-size: 24px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .subtitle {
+                font-size: 14px;
+                margin-bottom: 30px;
+            }
+
+            input, select, .btn {
+                padding: 12px;
+                font-size: 15px;
+            }
+
+            .birthdate-group {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .manual-marks-header {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 0;
+            }
+
+            .manual-marks-header .header-subject,
+            .manual-marks-header .header-marks {
+                flex: none;
+                width: 100%;
+                text-align: left;
+                padding: 0;
+                margin-bottom: 5px;
+            }
+            .manual-marks-header .header-marks {
+                margin-bottom: 0;
+            }
+
+            .marks-input-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+
+            .marks-input-row label {
+                flex: none;
+                width: 100%;
+                padding: 0;
+            }
+            .marks-input-row input {
+                flex: none;
+                width: 100%;
+            }
+        }
+        /* End Mobile-Friendly Adjustments */
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">C</div>
+        <h1>CRCE CGPA Calculator</h1>
+        <p class="subtitle">Calculate your CGPA automatically from the student portal</p>
+
+        <div class="form-group">
+            <label for="branchSelect">Branch</label>
+            <select id="branchSelect" name="branchSelect">
+                <option value="ME">Mechanical Engineering</option>
+                <option value="CE">Computer Engineering</option>
+                <option value="AI&DS">Computer Science Engg. (AI & DS)</option>
+                <option value="ECS">Electronics & Computer Science</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="semesterSelect">Semester</label>
+            <select id="semesterSelect" name="semesterSelect">
+                <option value="sem2">Semester 2</option>
+                <option value="sem4" selected>Semester 4</option>
+                <option value="sem6">Semester 6</option>
+            </select>
+        </div>
+
+        <form id="cgpaForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required placeholder="Enter your PRN">
+            </div>
+
+            <div class="birthdate-group">
+                <div class="form-group">
+                    <label for="birth_day">Birth Day</label>
+                    <select id="birth_day" name="birth_day" required>
+                        <option value="">Day</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="birth_month">Birth Month</label>
+                    <select id="birth_month" name="birth_month" required>
+                        <option value="">Month</option>
+                        <option value="01">January</option>
+                        <option value="02">February</option>
+                        <option value="03">March</option>
+                        <option value="04">April</option>
+                        <option value="05">May</option>
+                        <option value="06">June</option>
+                        <option value="07">July</option>
+                        <option value="08">August</option>
+                        <option value="09">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="birth_year">Birth Year</label>
+                    <select id="birth_year" name="birth_year" required>
+                        <option value="">Year</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="calculateBtn">
+                Calculate CGPA
+            </button>
+        </form>
+
+        <button class="btn toggle-manual" id="toggleManual">
+            Or Enter Marks Manually
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="processing-animation">
+                <div class="spinner"></div>
+                <span>Calculating...</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Initializing...</div>
+            </div>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <div class="cgpa-display" id="cgpaValue">0.00</div>
+            <div class="cgpa-label">Your CGPA</div>
+            <div class="marks-table" id="marksTable">
+                <div class="marks-table-header">
+                    <div class="header-name">Name</div>
+                    <div class="header-marks">Marks (Out of 100)</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="manual-calc" id="manualCalc">
+            <h3>Manual CGPA Calculator</h3>
+            <div class="manual-marks-header">
+                <div class="header-subject">Subject name</div>
+                <div class="header-marks">Marks (Out of 100)</div>
+            </div>
+            <div class="marks-input-grid" id="marksGrid">
+            </div>
+            <button type="button" class="btn" id="calculateManual">Calculate CGPA</button>
+        </div>
+          <div class="credits">
+            Made with ❤️ by Alok Shukla (TE Comps B)
+        </div>
+    </div>
+
+    <script>
+        // Default values for dropdowns
+        let currentSemester = 'sem4'; // Default to Semester 4
+        let currentBranch = 'ME'; // Default to Mechanical Engineering
+        let sessionId = null;
+        let progressInterval = null;
+
+        // Structured data for subjects by branch and semester
+        const semesterData = {
+            ME: {
+                sem2: {
+                    subjects: [
+                        'Basic Manufacturing Processes',
+                        'Integral Calculus and Probability Theory',
+                        'Engineering Chemistry',
+                        'Human Health Systems',
+                        'Essential Psychomotor Skills for Engineers',
+                        'Creative Coding in Python',
+                        'Indian Knowledge System',
+                        'Introduction to Emerging Technologies',
+                        'Programming Fundamentals',
+                        'Liberal Learning Course'
+                    ]
+                },
+                sem4: {
+                    subjects: [
+                        'Fundamentals of Thermodynamics',
+                        'Mechanics of Solids',
+                        'Materials Science and Engineering',
+                        'Materials and Material Testing',
+                        'Emerging Technology and Law',
+                        'Open Elective-3',
+                        'Computer Aided Machine Drawing',
+                        'Modern Indian Language',
+                        'Technology Entrepreneurship',
+                        'Technology Innovation for Sustainable Development',
+                        'Liberal Learning Course',
+                        'Indian Knowledge System',
+                        'Human Health Systems',
+                        'Creative Coding in Python'
+                    ]
+                },
+                sem6: {
+                    subjects: [
+                        'Machine Design',
+                        'Turbo Machinery',
+                        'Heating, Ventilation, Air conditioning and Refrigeration',
+                        'Automation and Artificial Intelligence',
+                        'Department Level Optional Course-2', // Consolidated for multiple optional subjects
+                        'Machine Design Lab',
+                        'Turbo Machinery Lab',
+                        'Heating, Ventilation, Air conditioning and Refrigeration Lab',
+                        'Measurements and Automation',
+                        'Mini Project 2B'
+                    ]
+                }
+            },
+            CE: {
+                sem2: {
+                    subjects: [
+                        'Digital Electronics',
+                        'Integral Calculus and Probability Theory',
+                        'Engineering Physics',
+                        'Human Health Systems',
+                        'Essential Computing Skills for Engineers',
+                        'Measuring Instruments and Testing Tools',
+                        'Art of Communication',
+                        'Introduction to Emerging Technologies',
+                        'Engineering Graphics',
+                        'Liberal Learning Course'
+                    ]
+                },
+                sem4: {
+                    subjects: [
+                        'Linear Algebra and Business Statistics',
+                        'Database Management Systems',
+                        'Analysis of Algorithm',
+                        'Advanced JAVA Programming Lab',
+                        'Emerging Technology and Law',
+                        'Microprocessor (Open Elective-3)',
+                        'Full Stack Development Lab',
+                        'Modern Indian Language',
+                        'Technology Entrepreneurship',
+                        'Technology Innovation for Sustainable Development',
+                        'Liberal Learning Course',
+                        'Indian Knowledge System',
+                        'Human Health Systems',
+                        'Creative Coding in Python',
+                    ]
+                },
+                sem6: {
+                    subjects: [
+                        'System Programming & Compiler Construction',
+                        'Cryptography & System Security',
+                        'Mobile Computing',
+                        'Artificial Intelligence',
+                        'Department Level Optional Course-2',
+                        'System Programming & Compiler Construction Lab',
+                        'Cryptography & System Security Lab',
+                        'Mobile Computing Lab',
+                        'Artificial Intelligence Lab',
+                        'Skill-based Laboratory',
+                        'Mini Project 2B',
+                    ]
+                }
+            },
+            'AI&DS': { // New Branch: Computer Science Engineering (AI & DS)
+                sem2: {
+                    subjects: [
+                        'Digital Electronics',
+                        'Integral Calculus and Probability Theory',
+                        'Engineering Chemistry',
+                        'Human Health Systems',
+                        'Essential Psychomotor Skills for Engineers',
+                        'Creative Coding in Python', // Corrected: removed trailing space
+                        'Indian Knowledge System',
+                        'Introduction to Emerging Technologies',
+                        'Programming Fundamentals',
+                        'Liberal Learning Course'
+                    ]
+                },
+                sem4: {
+                    subjects: [
+                        'Linear Algebra and Business Statistics',
+                        'Database Management Systems',
+                        'Analysis of Algorithm',
+                        'Data Analytics and Visualization',
+                        'Emerging Technology and Law',
+                        'Open Elective-3',
+                        'Web Programming',
+                        'Modern Indian Language',
+                        'Technology Entrepreneurship',
+                        'Technology Innovation for Sustainable Development',
+                        'Liberal Learning Course',
+                        'Indian Knowledge System',
+                        'Human Health Systems',
+                        'Creative Coding in Python',
+                    ]
+                },
+                sem6: {
+                    subjects: [
+                        'Data Analytics and Visualization',
+                        'Cryptography & System Security',
+                        'Software Engineering and Project Management',
+                        'Machine Learning',
+                        'Department Level Optional Course-2', // Consolidated for multiple optional subjects
+                        'Data Analytics and Visualization Lab',
+                        'Cryptography & System Security Lab',
+                        'Software Engineering and Project Management Lab',
+                        'Machine Learning Lab',
+                        'Skill base Lab Course: Cloud Computing',
+                        'Mini Project 2B',
+                    ]
+                }
+            },
+            'ECS': { // New Branch: Electronics & Computer Science
+                sem2: {
+                    subjects: [
+                        'Digital Electronics',
+                        'Integral Calculus and Probability Theory',
+                        'Engineering Chemistry',
+                        'Human Health Systems',
+                        'Essential Psychomotor Skills for Engineers',
+                        'Creative Coding in Python',
+                        'Indian Knowledge System',
+                        'Introduction to Emerging Technologies',
+                        'Programming Fundamentals',
+                        'Liberal Learning Course'
+                    ]
+                },
+                sem4: {
+                    subjects: [
+                        'Mathematics and Numerical Methods',
+                        'Analog Electronics',
+                        'Discrete Structures and AutomataTheory',
+                        'Embedded Systems',
+                        'Emerging Technology and Law',
+                        'Operating Systems',
+                        'Data Structures',
+                        'Modern Indian Language',
+                        'Technology Entrepreneurship',
+                        'Technology Innovation for Sustainable Development',
+                        'Liberal Learning Course',
+                        'Electromagnetic Theory',
+                        'Creative Coding in Python',
+                    ]
+                },
+                sem6: {
+                    subjects: [
+                        'Embedded Systems and RTOS',
+                        'Artificial Intelligence',
+                        'Computer Networks',
+                        'Data Warehousing and Mining',
+                        'Department Level Optional Course-2', // Consolidated for multiple optional subjects
+                        'Embedded Systems Lab',
+                        'Artificial Intelligence and Computer Networks Lab',
+                        'Data Warehousing and Mining Lab',
+                        'Skill base Laboratory',
+                        'Mini Project 2B',
+                    ]
+                }
+            }
+        };
+
+        function populateDays() {
+            const daySelect = document.getElementById('birth_day');
+            for (let i = 1; i <= 31; i++) {
+                const option = document.createElement('option');
+                option.value = String(i).padStart(2, '0');
+                option.textContent = i;
+                daySelect.appendChild(option);
+            }
+        }
+
+        function populateYears() {
+            const yearSelect = document.getElementById('birth_year');
+            const currentYear = new Date().getFullYear();
+            // Start year can be adjusted, for example, 1954 as per previous code
+            for (let i = currentYear - 30; i <= currentYear + 5; i++) { // Adjusted range for more typical birth years
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                yearSelect.appendChild(option);
+            }
+        }
+
+        // Event listener for Branch dropdown
+        document.getElementById('branchSelect').addEventListener('change', (event) => {
+            currentBranch = event.target.value;
+            generateManualInputs(); // Regenerate manual inputs for the selected branch and semester
+        });
+
+        // Event listener for Semester dropdown
+        document.getElementById('semesterSelect').addEventListener('change', (event) => {
+            currentSemester = event.target.value;
+            generateManualInputs(); // Regenerate manual inputs for the selected branch and semester
+        });
+
+        document.getElementById('cgpaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                username: formData.get('username'),
+                birth_day: formData.get('birth_day'),
+                birth_month: formData.get('birth_month'),
+                birth_year: formData.get('birth_year'),
+                semester: currentSemester,
+                branch: currentBranch // Pass selected branch to backend
+            };
+
+            try {
+                showLoading();
+                hideResults();
+                hideError();
+
+                const response = await fetch('/get_cgpa', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'started') {
+                    sessionId = result.session_id;
+                    startProgressPolling();
+                } else {
+                    throw new Error(result.error || 'Unknown error occurred');
+                }
+            } catch (error) {
+                hideLoading();
+                showError(error.message);
+            }
+        });
+
+        function startProgressPolling() {
+            progressInterval = setInterval(async () => {
+                try {
+                    const response = await fetch(`/progress?session_id=${sessionId}`);
+                    const result = await response.json();
+
+                    if (result.status === 'completed') {
+                        clearInterval(progressInterval);
+                        hideLoading();
+                        showResults(result.cgpa, result.marks);
+                    } else if (result.status === 'error') {
+                        clearInterval(progressInterval);
+                        hideLoading();
+                        showError(result.error);
+                    } else {
+                        updateProgress(result.message || 'Calculating...');
+                    }
+                } catch (error) {
+                    clearInterval(progressInterval);
+                    hideLoading();
+                    showError('Failed to get progress update');
+                }
+            }, 1000);
+        }
+
+        document.getElementById('toggleManual').addEventListener('click', () => {
+            const manualCalc = document.getElementById('manualCalc');
+            if (manualCalc.style.display === 'none' || !manualCalc.style.display) {
+                manualCalc.style.display = 'block';
+                manualCalc.classList.add('fade-in');
+                generateManualInputs(); // Regenerate inputs if showing
+                document.getElementById('toggleManual').textContent = 'Hide Manual Calculator';
+            } else {
+                manualCalc.style.display = 'none';
+                document.getElementById('toggleManual').textContent = 'Or Enter Marks Manually';
+            }
+        });
+
+        function generateManualInputs() {
+            const grid = document.getElementById('marksGrid');
+            const subjects = semesterData[currentBranch][currentSemester].subjects; // Use currentBranch and currentSemester
+            
+            grid.innerHTML = subjects.map(subject => `
+                <div class="marks-input-row">
+                    <label for="mark_${subject.replace(/\s+/g, '_').replace(/&/g, 'and')}">${subject}:</label>
+                    <input type="number"
+                            id="mark_${subject.replace(/\s+/g, '_').replace(/&/g, 'and')}"
+                            name="mark_${subject}"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            placeholder="0.00">
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('calculateManual').addEventListener('click', async () => {
+            const marks = {};
+            const subjects = semesterData[currentBranch][currentSemester].subjects;
+            
+            subjects.forEach(subject => {
+                const input = document.getElementById(`mark_${subject.replace(/\s+/g, '_').replace(/&/g, 'and')}`);
+                const value = parseFloat(input.value) || 0;
+                marks[subject] = value;
+            });
+
+            try {
+                showLoading();
+                hideResults();
+                hideError();
+
+                const response = await fetch('/calculate_manual', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        marks: marks,
+                        semester: currentSemester,
+                        branch: currentBranch
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    hideLoading();
+                    hideError();
+                    showResults(result.cgpa, result.marks);
+                } else {
+                    hideLoading();
+                    showError(result.error || 'Calculation failed');
+                }
+            } catch (error) {
+                hideLoading();
+                showError('Failed to calculate CGPA');
+            }
+        });
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('calculateBtn').disabled = true;
+            document.getElementById('calculateBtn').textContent = 'Calculating...';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressText').textContent = 'Initializing...';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('calculateBtn').disabled = false;
+            document.getElementById('calculateBtn').textContent = 'Calculate CGPA';
+        }
+
+        function updateProgress(message) {
+            document.getElementById('progressText').textContent = message;
+            const progressFill = document.getElementById('progressFill');
+            const currentWidth = parseInt(progressFill.style.width) || 0;
+            progressFill.style.width = Math.min(currentWidth + 10, 90) + '%';
+        }
+
+        function showResults(cgpa, marks) {
+            const resultsDiv = document.getElementById('results');
+            const cgpaValue = document.getElementById('cgpaValue');
+            const marksTable = document.getElementById('marksTable');
+
+            cgpaValue.textContent = cgpa.toFixed(2);
+            cgpaValue.classList.add('pulse');
+
+            const sortedMarks = Object.entries(marks).sort((a, b) => a[0].localeCompare(b[0]));
+
+            marksTable.innerHTML = sortedMarks
+                .map(([subject, mark]) => `
+                    <div class="marks-row">
+                        <div class="subject-name">${subject}</div>
+                        <div class="subject-mark">${mark.toFixed(1)}</div>
+                    </div>
+                `).join('');
+
+            resultsDiv.style.display = 'block';
+            resultsDiv.classList.add('fade-in');
+
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = 'Calculation completed!';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            errorDiv.classList.add('fade-in');
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function hideResults() {
+            document.getElementById('results').style.display = 'none';
+        }
+
+        // Initialize on page load
+        populateDays();
+        populateYears();
+        // Set initial values from dropdowns and generate manual inputs
+        currentBranch = document.getElementById('branchSelect').value;
+        currentSemester = document.getElementById('semesterSelect').value;
+        generateManualInputs();
+        
+        window.addEventListener('beforeunload', () => {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+        });
+    </script>
+</body>
+</html>
