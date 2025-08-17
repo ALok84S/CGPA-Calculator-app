@@ -6,8 +6,7 @@ import time
 import re
 import uuid
 import os
-
-import os
+os.environ['SELENIUM_CACHE_DIR'] = '/tmp/.selenium'
 import subprocess
 import json
 from selenium import webdriver
