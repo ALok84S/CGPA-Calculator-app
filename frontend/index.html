@@ -799,7 +799,7 @@
                 hideResults();
                 hideError();
 
-                const response = await fetch('/get_cgpa', {
+                const response = await fetch('https://cgpa-calculator-app.onrender.com/get_cgpa', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -824,7 +824,7 @@
         function startProgressPolling() {
             progressInterval = setInterval(async () => {
                 try {
-                    const response = await fetch(`/progress?session_id=${sessionId}`);
+                    const response = await fetch(`https://cgpa-calculator-app.onrender.com/progress?session_id=${sessionId}`);
                     const result = await response.json();
 
                     if (result.status === 'completed') {
@@ -892,7 +892,7 @@
                 hideResults();
                 hideError();
 
-                const response = await fetch('/calculate_manual', {
+                const response = await fetch('https://cgpa-calculator-app.onrender.com/calculate_manual', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
