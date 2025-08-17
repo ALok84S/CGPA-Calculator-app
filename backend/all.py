@@ -51,7 +51,7 @@ def cleanup_chrome_processes_and_dirs():
                 if os.path.isdir(dir_path):
                     dir_age = current_time - os.path.getctime(dir_path)
                     if dir_age > 3600:  # Remove directories older than 1 hour
-                        shutil.rmtree(dir_path, ignore_errors=True)
+                        # shutil.rmtree(dir_path, ignore_errors=True)
                         print(f"Cleaned up old directory: {dir_path}")
     except Exception as e:
         print(f"Error in cleanup: {e}")
@@ -644,18 +644,23 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     # Clean up before starting
     cleanup_chrome_processes_and_dirs()
     
-    # Generate unique session identifiers FIRST
-    session_id = str(uuid.uuid4())[:8]  # Shorter UUID
-    timestamp = str(int(time.time()))[-6:]  # Last 6 digits of timestamp
-    user_data_dir = f"/tmp/chrome-data/session-{session_id}-{timestamp}"
+    # # Generate unique session identifiers FIRST
+    # session_id = str(uuid.uuid4())[:8]  # Shorter UUID
+    # timestamp = str(int(time.time()))[-6:]  # Last 6 digits of timestamp
+    # user_data_dir = f"/tmp/chrome-data/session-{session_id}-{timestamp}"
     
     chrome_options = Options()
     
-    # Essential options for containerized deployment
+    chrome_options = Options()
+
+# Essential options for containerized deployment
     chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')  # CRITICAL FOR DOCKER
+    chrome_options.add_argument('--disable-dev-shm-usage')  # CRITICAL FOR RENDER
     chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--no-zygote')       # FOR RENDER
+    chrome_options.add_argument('--single-process')  # FOR RENDER
+    chrome_options.add_argument('--disable-sync')    # PREVENTS PROFILE CONFLICTS
     chrome_options.add_argument('--disable-web-security')
     chrome_options.add_argument('--disable-extensions')
     chrome_options.add_argument('--disable-plugins')
@@ -670,22 +675,20 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     chrome_options.add_argument('--disable-ipc-flooding-protection')
     chrome_options.add_argument('--disable-background-networking')
     chrome_options.add_argument('--disable-software-rasterizer')
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument('--start-maximized')
-    chrome_options.add_argument('--remote-debugging-port=9222')
-    
-    # Memory and performance optimizations
+    chrome_options.add_argument('--disable-default-apps')
+    chrome_options.add_argument('--window-size=1280,720')  # SMALLER FOR RENDER
     chrome_options.add_argument('--memory-pressure-off')
-    chrome_options.add_argument('--max-old-space-size=512')
+    chrome_options.add_argument('--max-old-space-size=256')  # REDUCED FOR RENDER
+
     
-    # Create user data directory with proper permissions
-    try:
-        os.makedirs(user_data_dir, mode=0o755, exist_ok=True)
-        chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
-        chrome_options.add_argument(f'--profile-directory=Profile-{session_id}')
-    except Exception as e:
-        print(f"Warning: Could not create user data directory: {e}")
-        # Continue without user-data-dir if creation fails
+    # # Create user data directory with proper permissions
+    # try:
+    #     os.makedirs(user_data_dir, mode=0o755, exist_ok=True)
+    #     chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    #     chrome_options.add_argument(f'--profile-directory=Profile-{session_id}')
+    # except Exception as e:
+    #     print(f"Warning: Could not create user data directory: {e}")
+    #     # Continue without user-data-dir if creation fails
     
     # Set Chrome binary path for containerized environments
     chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
@@ -1116,13 +1119,13 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                 except:
                     print(f"DEBUG: Error closing browser")
                 
-                # Clean up user data directory
-                try:
-                    if 'user_data_dir' in locals() and os.path.exists(user_data_dir):
-                        shutil.rmtree(user_data_dir, ignore_errors=True)
-                        print(f"DEBUG: Cleaned up user data directory: {user_data_dir}")
-                except Exception as e:
-                    print(f"DEBUG: Error cleaning up directory: {e}")
+                # # Clean up user data directory
+                # try:
+                #     if 'user_data_dir' in locals() and os.path.exists(user_data_dir):
+                #         shutil.rmtree(user_data_dir, ignore_errors=True)
+                #         print(f"DEBUG: Cleaned up user data directory: {user_data_dir}")
+                # except Exception as e:
+                #     print(f"DEBUG: Error cleaning up directory: {e}")
 
     return student_marks
 
@@ -1590,11 +1593,9 @@ def calculate_manual():
 def test_chrome():
     """Test Chrome initialization with detailed debugging"""
     try:
-        import os
         chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
         chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
         
-        # Check if files exist
         chrome_exists = os.path.exists(chrome_bin)
         driver_exists = os.path.exists(chromedriver_path)
         
@@ -1602,43 +1603,35 @@ def test_chrome():
             return jsonify({
                 'status': 'error',
                 'chrome_exists': chrome_exists,
-                'chrome_path': chrome_bin,
                 'driver_exists': driver_exists,
-                'driver_path': chromedriver_path,
                 'message': 'Missing Chrome or ChromeDriver'
             }), 500
 
-        # Test basic Chrome options
+        # Test with clean options
         chrome_options = Options()
         chrome_options.add_argument('--headless=new')
         chrome_options.add_argument('--no-sandbox')
         chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
         chrome_options.add_argument('--no-zygote')
         chrome_options.add_argument('--single-process')
         chrome_options.binary_location = chrome_bin
         
-        # Try to initialize driver
         service = Service(chromedriver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.get("data:text/html,<html><body><h1>Test Page</h1></body></html>")
+        driver.get("data:text/html,<html><body><h1>Test</h1></body></html>")
         title = driver.title
         driver.quit()
         
         return jsonify({
             'status': 'success',
-            'message': 'Chrome is working perfectly!',
-            'chrome_path': chrome_bin,
-            'driver_path': chromedriver_path,
+            'message': 'Chrome working perfectly!',
             'page_title': title
         })
         
     except Exception as e:
-        import traceback
         return jsonify({
             'status': 'error',
-            'message': str(e),
-            'traceback': traceback.format_exc()
+            'message': str(e)
         }), 500
 
 @app.route('/system-info')
