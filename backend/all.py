@@ -639,7 +639,16 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     # Memory and performance optimizations for Railway/Render
     chrome_options.add_argument('--memory-pressure-off')
     chrome_options.add_argument('--max-old-space-size=512')
-    chrome_options.add_argument('--single-process')  # Use with caution - may help with memory
+    
+    # --- CHANGE THIS SECTION ---
+    # Generate a unique user data directory for each session to prevent conflicts
+    user_data_dir = f"/tmp/chrome-user-data-{uuid.uuid4()}"
+    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+    
+    # The --single-process flag can be problematic in concurrent environments; it's best to remove it.
+    # The line below is commented out in your original code, which is correct.
+    # # chrome_options.add_argument('--single-process')
+    # -----------------------------
     
     # Set Chrome binary path for containerized environments
     chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
