@@ -1406,7 +1406,10 @@ def home():
             "/health",
             "/get_cgpa",
             "/calculate_manual",
-            "/progress"
+            "/progress",
+            "/system-info",      # NEW
+            "/test-chrome",      # NEW
+            "/fix-chrome-options" # NEW
         ]
     }), 200
 
@@ -1564,7 +1567,164 @@ def calculate_manual():
         
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 400
+    
+@app.route('/test-chrome')
+def test_chrome():
+    """Test Chrome initialization with detailed debugging"""
+    try:
+        import os
+        chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+        chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+        
+        # Check if files exist
+        chrome_exists = os.path.exists(chrome_bin)
+        driver_exists = os.path.exists(chromedriver_path)
+        
+        if not chrome_exists or not driver_exists:
+            return jsonify({
+                'status': 'error',
+                'chrome_exists': chrome_exists,
+                'chrome_path': chrome_bin,
+                'driver_exists': driver_exists,
+                'driver_path': chromedriver_path,
+                'message': 'Missing Chrome or ChromeDriver'
+            }), 500
 
+        # Test basic Chrome options
+        chrome_options = Options()
+        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-zygote')
+        chrome_options.add_argument('--single-process')
+        chrome_options.binary_location = chrome_bin
+        
+        # Try to initialize driver
+        service = Service(chromedriver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        driver.get("data:text/html,<html><body><h1>Test Page</h1></body></html>")
+        title = driver.title
+        driver.quit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Chrome is working perfectly!',
+            'chrome_path': chrome_bin,
+            'driver_path': chromedriver_path,
+            'page_title': title
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/system-info')
+def system_info():
+    """Get system information for debugging"""
+    try:
+        import platform
+        
+        info = {
+            'platform': platform.platform(),
+            'python_version': platform.python_version(),
+            'memory_usage': f"{psutil.virtual_memory().percent}%",
+            'disk_usage': f"{psutil.disk_usage('/').percent}%",
+            'cpu_count': psutil.cpu_count(),
+            'chrome_bin_exists': os.path.exists(os.environ.get("CHROME_BIN", "/usr/bin/chromium")),
+            'chromedriver_exists': os.path.exists(os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")),
+            'tmp_writable': os.access('/tmp', os.W_OK),
+            'chrome_version': None,
+            'processes': []
+        }
+        
+        # Try to get Chrome version
+        try:
+            chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+            if os.path.exists(chrome_bin):
+                result = subprocess.run([chrome_bin, '--version'], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    info['chrome_version'] = result.stdout.strip()
+        except:
+            pass
+            
+        # Check for existing Chrome processes
+        try:
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+                if 'chrome' in proc.info['name'].lower() or 'chromium' in proc.info['name'].lower():
+                    info['processes'].append({
+                        'pid': proc.info['pid'],
+                        'name': proc.info['name']
+                    })
+        except:
+            pass
+        
+        return jsonify(info)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error', 
+            'message': str(e)
+        }), 500
+
+@app.route('/fix-chrome-options')
+def fix_chrome_options():
+    """Test the updated Chrome options that should work on Render"""
+    try:
+        chrome_options = Options()
+        
+        # Render-optimized Chrome options
+        chrome_options.add_argument('--headless=new')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')  # MOST CRITICAL
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-zygote')  # For Render
+        chrome_options.add_argument('--single-process')  # For Render  
+        chrome_options.add_argument('--disable-extensions')
+        chrome_options.add_argument('--disable-plugins')
+        chrome_options.add_argument('--disable-images')
+        chrome_options.add_argument('--disable-background-networking')
+        chrome_options.add_argument('--disable-default-apps')
+        chrome_options.add_argument('--window-size=1280,720')
+        chrome_options.add_argument('--memory-pressure-off')
+        
+        chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+        
+        # Test initialization
+        chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+        service = Service(chromedriver_path)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        # Test navigation
+        driver.get("https://www.google.com")
+        title = driver.title
+        driver.quit()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Fixed Chrome options work!',
+            'page_title': title,
+            'options_used': [
+                '--headless=new',
+                '--no-sandbox', 
+                '--disable-dev-shm-usage',
+                '--single-process',
+                '--no-zygote'
+            ]
+        })
+        
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
 # Update your main block at the end of the file
 if __name__ == '__main__':
     # Get port from environment (Railway provides this)
