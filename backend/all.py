@@ -24,7 +24,8 @@ app = Flask(__name__)
 CORS(app)  # allow frontend on Vercel to talk to backend
 app.secret_key = os.urandom(24)
 
-# ADD THE BROWSER SETUP CHECK HERE - RIGHT AFTER APP INITIALIZATION
+# Add this right after: app.secret_key = os.urandom(24)
+
 def check_browser_setup():
     """Check if Chrome and ChromeDriver are properly installed for containerized environments."""
     chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
@@ -78,7 +79,7 @@ def check_browser_setup():
     
     return chrome_bin, chromedriver_path
 
-# CALL THE CHECK FUNCTION RIGHT HERE
+# Call the check function
 try:
     check_browser_setup()
     print("🚀 Browser setup check completed")
@@ -1455,6 +1456,14 @@ def get_progress():
         return jsonify(progress_data[session_id])
     else:
         return jsonify({'status': 'waiting', 'message': 'Initializing...'})
+    
+@app.route('/health')
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'chrome_available': os.path.exists(os.environ.get("CHROME_BIN", "/usr/bin/chromium")),
+        'chromedriver_available': os.path.exists(os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver"))
+    }), 200
 
 @app.route('/calculate_manual', methods=['POST'])
 def calculate_manual():
@@ -1512,4 +1521,4 @@ def calculate_manual():
 if __name__ == '__main__':
     # app.run(debug=True)
     # For deployment, consider setting host and port explicitly:
-    app.run(host='0.0.0.0', port=5000, debug= True)
+    app.run(host='0.0.0.0', port=8000, debug= True)
