@@ -3,8 +3,10 @@ from flask_cors import CORS
 
 import threading
 import time
+import shutil
 import re
 import uuid
+import psutil  # Add this import
 import os
 os.environ['SELENIUM_CACHE_DIR'] = '/tmp/.selenium'
 import subprocess
@@ -24,6 +26,35 @@ CORS(app)  # allow frontend on Vercel to talk to backend
 app.secret_key = os.urandom(24)
 
 # Add this right after: app.secret_key = os.urandom(24)
+
+def cleanup_chrome_processes_and_dirs():
+    """Clean up orphaned Chrome processes and old directories."""
+    try:
+        # Kill orphaned Chrome processes
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                proc_name = proc.info['name'].lower()
+                if 'chrome' in proc_name or 'chromium' in proc_name:
+                    cmdline = ' '.join(proc.info['cmdline']) if proc.info['cmdline'] else ''
+                    if '/tmp/chrome-data' in cmdline and '--headless' in cmdline:
+                        print(f"Killing orphaned Chrome process: PID {proc.info['pid']}")
+                        proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        
+        # Clean up old directories
+        base_chrome_dir = "/tmp/chrome-data"
+        if os.path.exists(base_chrome_dir):
+            current_time = time.time()
+            for dir_name in os.listdir(base_chrome_dir):
+                dir_path = os.path.join(base_chrome_dir, dir_name)
+                if os.path.isdir(dir_path):
+                    dir_age = current_time - os.path.getctime(dir_path)
+                    if dir_age > 3600:  # Remove directories older than 1 hour
+                        shutil.rmtree(dir_path, ignore_errors=True)
+                        print(f"Cleaned up old directory: {dir_path}")
+    except Exception as e:
+        print(f"Error in cleanup: {e}")
 
 def check_browser_setup():
     """Check if Chrome and ChromeDriver are properly installed for containerized environments."""
@@ -588,36 +619,24 @@ def scale_mark_to_100(subject_key, mark, semester, branch):
     
     return (mark / max_marks) * 100
 
-def calculate_subject_mark(subject_key, component_marks, semester, branch):
-    """
-    Calculates the final mark for a subject by summing its components
-    and then scaling it to be out of 100, considering semester and branch.
-    """
-    if not component_marks:
-        return 0.0
-
-    total_component_sum = sum(component_marks)
-    
-    # The complex logic for combining components is mostly handled by the fact that
-    # 'extract_marks_from_page' should ideally get all relevant numeric parts,
-    # and 'scale_mark_to_100' uses the total max marks.
-    # The specific 'if len(component_marks) >= X' conditions were making it brittle.
-    # We now simply sum all extracted components and let scale_mark_to_100 handle the overall scaling.
-    
-    return scale_mark_to_100(subject_key, total_component_sum, semester, branch)
-
-# --- Enhanced Selenium Automation Function ---
-# --- Enhanced Selenium Automation Function ---
 def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester="sem4", branch="ME", progress_callback=None):
     LOGIN_URL = "https://crce-students.contineo.in/parentseven/"
     student_marks = {}
+    
+    # Clean up before starting
+    cleanup_chrome_processes_and_dirs()
+    
+    # Generate unique session identifiers FIRST
+    session_id = str(uuid.uuid4())[:8]  # Shorter UUID
+    timestamp = str(int(time.time()))[-6:]  # Last 6 digits of timestamp
+    user_data_dir = f"/tmp/chrome-data/session-{session_id}-{timestamp}"
     
     chrome_options = Options()
     
     # Essential options for containerized deployment
     chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-dev-shm-usage')  # CRITICAL FOR DOCKER
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('--disable-web-security')
     chrome_options.add_argument('--disable-extensions')
@@ -629,25 +648,26 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     chrome_options.add_argument('--disable-background-timer-throttling')
     chrome_options.add_argument('--disable-backgrounding-occluded-windows')
     chrome_options.add_argument('--disable-renderer-backgrounding')
-    chrome_options.add_argument('--disable-features=TranslateUI')
+    chrome_options.add_argument('--disable-features=TranslateUI,VizDisplayCompositor')
     chrome_options.add_argument('--disable-ipc-flooding-protection')
+    chrome_options.add_argument('--disable-background-networking')
+    chrome_options.add_argument('--disable-software-rasterizer')
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--remote-debugging-port=9222')
     
-    # Memory and performance optimizations for Railway/Render
+    # Memory and performance optimizations
     chrome_options.add_argument('--memory-pressure-off')
     chrome_options.add_argument('--max-old-space-size=512')
     
-    # --- CHANGE THIS SECTION ---
-    # Generate a unique user data directory for each session to prevent conflicts
-    user_data_dir = f"/tmp/chrome-user-data-{uuid.uuid4()}"
-    chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
-    
-    # The --single-process flag can be problematic in concurrent environments; it's best to remove it.
-    # The line below is commented out in your original code, which is correct.
-    # # chrome_options.add_argument('--single-process')
-    # -----------------------------
+    # Create user data directory with proper permissions
+    try:
+        os.makedirs(user_data_dir, mode=0o755, exist_ok=True)
+        chrome_options.add_argument(f'--user-data-dir={user_data_dir}')
+        chrome_options.add_argument(f'--profile-directory=Profile-{session_id}')
+    except Exception as e:
+        print(f"Warning: Could not create user data directory: {e}")
+        # Continue without user-data-dir if creation fails
     
     # Set Chrome binary path for containerized environments
     chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
@@ -675,15 +695,13 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                 driver = webdriver.Chrome(service=service, options=chrome_options)
                 print(f"DEBUG: Using system chromedriver: {chromedriver_path}")
             else:
-                # Fallback to ChromeDriverManager
-                # service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                print(f"DEBUG: Using ChromeDriverManager")
+                # Fallback - let selenium find chromedriver
+                driver = webdriver.Chrome(options=chrome_options)
+                print(f"DEBUG: Using default chromedriver")
                 
         except Exception as e:
             print(f"DEBUG: ChromeDriver initialization failed: {e}")
-            # Final fallback - let selenium find chromedriver
-            driver = webdriver.Chrome(options=chrome_options)
+            raise Exception(f"Browser initialization failed: {e}")
         
         # Set timeouts
         driver.set_page_load_timeout(30)
@@ -1051,7 +1069,7 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                 if progress_callback:
                     progress_callback("Cleaning up...")
                 
-                # Try to logout
+                # Try to logout first
                 try:
                     logout_selectors = [
                         "//a[contains(text(), 'Logout') or contains(text(), 'Log Out')]",
@@ -1079,6 +1097,14 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                     print(f"DEBUG: Browser closed successfully")
                 except:
                     print(f"DEBUG: Error closing browser")
+                
+                # Clean up user data directory
+                try:
+                    if 'user_data_dir' in locals() and os.path.exists(user_data_dir):
+                        shutil.rmtree(user_data_dir, ignore_errors=True)
+                        print(f"DEBUG: Cleaned up user data directory: {user_data_dir}")
+                except Exception as e:
+                    print(f"DEBUG: Error cleaning up directory: {e}")
 
     return student_marks
 

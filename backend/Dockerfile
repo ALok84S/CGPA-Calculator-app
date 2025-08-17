@@ -6,7 +6,16 @@ ENV PYTHONUNBUFFERED=1
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies for Chromium
+# Set Chrome/Chromium environment variables
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
+ENV DISPLAY=:99
+ENV CHROME_NO_SANDBOX=true
+
+# Create app directory first
+WORKDIR /app
+
+# Install system dependencies for Chromium with optimizations
 RUN apt-get update && apt-get install -y \
     wget gnupg unzip curl ca-certificates \
     chromium chromium-driver \
@@ -15,6 +24,7 @@ RUN apt-get update && apt-get install -y \
     libasound2 libatspi2.0-0 fonts-liberation \
     libappindicator3-1 xdg-utils \
     fonts-dejavu-core fonts-freefont-ttf \
+    procps \
     && chmod +x /usr/bin/chromedriver \
     && ln -sf /usr/bin/chromium /usr/bin/google-chrome \
     && apt-get clean \
@@ -22,17 +32,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /tmp/* \
     && rm -rf /var/tmp/*
 
-# Set Chrome/Chromium environment variables
-ENV CHROME_BIN=/usr/bin/chromium
-ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver
-ENV DISPLAY=:99
-ENV CHROME_NO_SANDBOX=true
-
-# Create app directory
-WORKDIR /app
-
 # Create non-root user first (better security practice)
 RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Create directories for Chrome user data with proper permissions
+RUN mkdir -p /tmp/chrome-data \
+    && mkdir -p /app/chrome-sessions \
+    && mkdir -p /dev/shm \
+    && chown -R appuser:appuser /tmp/chrome-data \
+    && chown -R appuser:appuser /app/chrome-sessions \
+    && chmod 755 /tmp/chrome-data \
+    && chmod 755 /app/chrome-sessions \
+    && chmod 1777 /dev/shm
 
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
@@ -55,5 +66,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
-# Change the CMD instruction to the most compatible form
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 300 --keep-alive 5 --max-requests 100 --preload --access-logfile - --error-logfile - --log-level info all:app"]
+# Optimized CMD with better resource management
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --threads 4 --timeout 300 --keep-alive 5 --max-requests 100 --max-requests-jitter 50 --preload --access-logfile - --error-logfile - --log-level info all:app"]
