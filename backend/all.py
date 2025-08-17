@@ -551,20 +551,13 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     student_marks = {}
     
     chrome_options = Options()
-    # Essential Chrome options for stability
-    # Comment out headless for debugging
     chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--disable-software-rasterizer')
-    chrome_options.add_argument('--disable-extensions')
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument('--start-maximized')
-    chrome_options.add_argument('--ignore-certificate-errors')
-    chrome_options.add_argument('--allow-running-insecure-content')
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     
+    chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
 
     driver = None
     
@@ -572,42 +565,15 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
         if progress_callback:
             progress_callback("Initializing browser...")
         
-        try:
-            # Check Chrome installation
-            chrome_version = get_chrome_version()
-            if not chrome_version:
-                raise Exception("Chrome browser is not installed. Please install Google Chrome first.")
-                
-            if progress_callback:
-                progress_callback(f"Detected Chrome version: {chrome_version}")
-            
-            # Install ChromeDriver
-            from webdriver_manager.core.os_manager import ChromeType
-            driver_path = ChromeDriverManager(chrome_type=ChromeType.GOOGLE).install()
-            
-            if not os.path.exists(driver_path):
-                raise Exception("ChromeDriver installation failed. Please check your internet connection and try again.")
-            
-            # Create service with the driver path
-            service = Service(driver_path)
-            
-            # Create driver with the service and options
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            
-            if progress_callback:
-                progress_callback("Browser initialized successfully...")
-                
-        except Exception as e:
-            error_msg = str(e)
-            if "Chrome browser is not installed" in error_msg:
-                raise Exception("Please install Google Chrome browser first from https://www.google.com/chrome/")
-            elif "chromedriver" in error_msg.lower() and "executable" in error_msg.lower():
-                raise Exception("ChromeDriver installation failed. Please:\n1. Close all Chrome windows\n2. Check your internet connection\n3. Try again")
-            elif "session not created" in error_msg.lower():
-                raise Exception(f"Chrome version mismatch. Please update Chrome browser to the latest version. Current version: {get_chrome_version()}")
-            else:
-                raise Exception(f"Browser initialization failed: {error_msg}\nPlease ensure Chrome is up to date and try again.")
+        # --- Corrected Browser Initialization ---
+        # This part of the code correctly initializes the WebDriver.
+        service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         
+        if progress_callback:
+            progress_callback("Browser initialized successfully...")
+            
+        # --- Core Scraping Logic Starts Here (Moved from the except block) ---
         if progress_callback:
             progress_callback("Connecting to portal...")
         
@@ -617,7 +583,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
             EC.presence_of_element_located((By.ID, "username"))
         )
         
-        # Login process (same as before)
         if progress_callback:
             progress_callback("Processing...")
         
@@ -631,7 +596,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
         
         time.sleep(0.5)
 
-        # Login button handling (same as before)
         login_success = False
         login_attempts = [
             (By.XPATH, "//input[@type='submit']"),
@@ -678,7 +642,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
         dashboard_url = driver.current_url
         print(f"DEBUG: Dashboard URL: {dashboard_url}")
         
-        # Check for login errors
         try:
             error_message_element = driver.find_element(By.XPATH, "//*[contains(text(), 'Invalid Username') or contains(text(), 'Incorrect') or contains(text(), 'Authentication failed')]")
             if error_message_element.is_displayed():
@@ -716,23 +679,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
         total_subjects = len(subject_rows)
         print(f"DEBUG: Found {total_subjects} subjects")
         
-        # Print all subjects first for debugging
-        for i, subject_row in enumerate(subject_rows):
-            try:
-                subject_code_element = subject_row.find_element(By.CSS_SELECTOR, "td:nth-child(1)")
-                course_code = subject_code_element.text.strip()
-                
-                subject_name_element = subject_row.find_element(By.CSS_SELECTOR, "td:nth-child(2)")
-                raw_subject_name = subject_name_element.text.strip()
-                
-                print(f"DEBUG: Subject {i+1}: Code='{course_code}', Name='{raw_subject_name}'")
-                
-                subject_key = map_subject_name(course_code, raw_subject_name, semester, branch)
-                print(f"DEBUG: Mapped to: '{subject_key}'")
-                
-            except Exception as e:
-                print(f"DEBUG: Error reading subject {i+1}: {e}")
-        
         for i, subject_row in enumerate(subject_rows):
             try:
                 if progress_callback:
@@ -763,7 +709,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
 
                 print(f"DEBUG: Looking for CIE button for {subject_key}")
 
-                # Enhanced CIE button detection
                 cie_button_selectors = [
                     ".//a[./button[contains(@class, 'cn-cieclr') and text()='CIE']]",
                     ".//button[contains(@class, 'cn-cieclr') and text()='CIE']",
@@ -785,7 +730,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                 
                 if not cie_link_element:
                     print(f"DEBUG: No CIE button found for {subject_key}")
-                    # Try to find any clickable elements in this row
                     all_links = subject_row.find_elements(By.TAG_NAME, "a")
                     all_buttons = subject_row.find_elements(By.TAG_NAME, "button")
                     print(f"DEBUG: Found {len(all_links)} links and {len(all_buttons)} buttons in row")
@@ -818,13 +762,12 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
 
                 print(f"DEBUG: Waiting for marks page to load...")
                 
-                # Wait for marks page with multiple strategies
                 marks_page_loaded = False
                 wait_strategies = [
                     (By.XPATH, f"//caption[contains(text(), '{re.escape(course_code)}') or contains(text(), '{re.escape(raw_subject_name)}')]"),
                     (By.XPATH, "//table[contains(@class, 'marks') or contains(@class, 'result')]"),
                     (By.XPATH, "//table//th[contains(text(), 'Marks') or contains(text(), 'Score')]"),
-                    (By.XPATH, "//table")  # Fallback to any table
+                    (By.XPATH, "//table")
                 ]
                 
                 for strategy in wait_strategies:
@@ -841,13 +784,11 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                     print(f"DEBUG: Current URL after click: {driver.current_url}")
                     print(f"DEBUG: Page title: {driver.title}")
                     
-                    # Print page source snippet for debugging
                     page_source_snippet = driver.page_source[:1000]
                     print(f"DEBUG: Page source snippet: {page_source_snippet}")
 
                 print(f"DEBUG: Current URL after navigation: {driver.current_url}")
 
-                # Extract marks with debugging
                 raw_marks_strings = extract_marks_from_page_debug(driver)
                 print(f"DEBUG: Raw marks extracted for {subject_key}: {raw_marks_strings}")
                 
@@ -863,11 +804,9 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                     student_marks[subject_key] = calculated_mark
                     print(f"DEBUG: Final calculated mark for {subject_key}: {calculated_mark}")
 
-                # Return to dashboard
                 print(f"DEBUG: Returning to dashboard...")
                 driver.back()
                 
-                # Wait for dashboard with timeout
                 try:
                     WebDriverWait(driver, 15).until(
                         EC.url_to_be(dashboard_url) or EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
@@ -875,7 +814,6 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                     print(f"DEBUG: Successfully returned to dashboard")
                 except TimeoutException:
                     print(f"DEBUG: Timeout returning to dashboard, current URL: {driver.current_url}")
-                    # Try to navigate back to dashboard directly
                     driver.get(dashboard_url)
                     WebDriverWait(driver, 10).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
@@ -948,6 +886,7 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
                 print(f"DEBUG: Browser closed")
 
     return student_marks
+
 def map_subject_name(course_code, raw_subject_name, semester, branch):
     """Maps course codes and raw subject names from the portal to standardized subject keys based on semester and branch."""
     normalized_raw_name = raw_subject_name.strip()
