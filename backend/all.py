@@ -1365,7 +1365,16 @@ def update_progress(session_id, message):
 
 @app.route('/')
 def home():
-    return jsonify({"message": "Backend is running ✅"})
+    return jsonify({
+        "message": "Backend is running ✅",
+        "status": "healthy",
+        "available_endpoints": [
+            "/health",
+            "/get_cgpa",
+            "/calculate_manual",
+            "/progress"
+        ]
+    }), 200
 
 def index():
     return render_template('index.html')
@@ -1457,13 +1466,17 @@ def get_progress():
     else:
         return jsonify({'status': 'waiting', 'message': 'Initializing...'})
     
+# Add this route for basic testing
 @app.route('/health')
 def health_check():
     return jsonify({
         'status': 'healthy',
+        'message': 'Backend is running ✅',
         'chrome_available': os.path.exists(os.environ.get("CHROME_BIN", "/usr/bin/chromium")),
-        'chromedriver_available': os.path.exists(os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver"))
+        'chromedriver_available': os.path.exists(os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")),
+        'port': os.environ.get("PORT", "not set")
     }), 200
+
 
 @app.route('/calculate_manual', methods=['POST'])
 def calculate_manual():
@@ -1518,7 +1531,13 @@ def calculate_manual():
     except Exception as e:
         return jsonify({'status': 'error', 'error': str(e)}), 400
 
+# Update your main block at the end of the file
 if __name__ == '__main__':
-    # app.run(debug=True)
-    # For deployment, consider setting host and port explicitly:
-    app.run(host='0.0.0.0', port=8000, debug= True)
+    # Get port from environment (Railway provides this)
+    port = int(os.environ.get('PORT', 8000))
+    # Make sure to bind to all interfaces (0.0.0.0)
+    app.run(host='0.0.0.0', port=port, debug=False)
+else:
+    # This is important for gunicorn
+    # Make sure the app is accessible when imported
+    application = app
