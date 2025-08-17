@@ -619,6 +619,24 @@ def scale_mark_to_100(subject_key, mark, semester, branch):
     
     return (mark / max_marks) * 100
 
+def calculate_subject_mark(subject_key, component_marks, semester, branch):
+    """
+    Calculates the final mark for a subject by summing its components
+    and then scaling it to be out of 100, considering semester and branch.
+    """
+    if not component_marks:
+        return 0.0
+
+    total_component_sum = sum(component_marks)
+    
+    # The complex logic for combining components is mostly handled by the fact that
+    # 'extract_marks_from_page' should ideally get all relevant numeric parts,
+    # and 'scale_mark_to_100' uses the total max marks.
+    # The specific 'if len(component_marks) >= X' conditions were making it brittle.
+    # We now simply sum all extracted components and let scale_mark_to_100 handle the overall scaling.
+    
+    return scale_mark_to_100(subject_key, total_component_sum, semester, branch)
+
 def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester="sem4", branch="ME", progress_callback=None):
     LOGIN_URL = "https://crce-students.contineo.in/parentseven/"
     student_marks = {}
