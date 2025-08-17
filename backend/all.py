@@ -546,34 +546,84 @@ def calculate_subject_mark(subject_key, component_marks, semester, branch):
     return scale_mark_to_100(subject_key, total_component_sum, semester, branch)
 
 # --- Enhanced Selenium Automation Function ---
+# --- Enhanced Selenium Automation Function ---
 def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester="sem4", branch="ME", progress_callback=None):
     LOGIN_URL = "https://crce-students.contineo.in/parentseven/"
     student_marks = {}
     
     chrome_options = Options()
+    # Essential Chrome options for Docker environment
     chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    chrome_options.add_argument('--disable-web-security')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-plugins')
+    chrome_options.add_argument('--disable-images')
+    # Disabling JavaScript might break the portal's functionality
+    # chrome_options.add_argument('--disable-javascript')
+    chrome_options.add_argument('--disable-plugins-discovery')
+    chrome_options.add_argument('--no-first-run')
+    chrome_options.add_argument('--no-default-browser-check')
+    chrome_options.add_argument('--disable-default-apps')
+    chrome_options.add_argument('--disable-popup-blocking')
+    chrome_options.add_argument('--disable-translate')
+    chrome_options.add_argument('--disable-background-timer-throttling')
+    chrome_options.add_argument('--disable-renderer-backgrounding')
+    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+    chrome_options.add_argument('--disable-client-side-phishing-detection')
+    chrome_options.add_argument('--disable-sync')
+    chrome_options.add_argument('--metrics-recording-only')
+    chrome_options.add_argument('--no-report-upload')
+    chrome_options.add_argument('--disable-crash-reporter')
+    chrome_options.add_argument('--disable-in-process-stack-traces')
+    chrome_options.add_argument('--disable-logging')
+    chrome_options.add_argument('--disable-dev-tools')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--start-maximized')
     
-    chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
-
+    # Set binary location
+    # This should be handled by the Dockerfile, but a fallback is good practice
+    chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/google-chrome")
+    
+    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+    chrome_options.add_experimental_option('useAutomationExtension', False)
+    
     driver = None
     
     try:
         if progress_callback:
             progress_callback("Initializing browser...")
         
-        # --- Corrected Browser Initialization ---
-        # This part of the code correctly initializes the WebDriver.
-        service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        # Initialize WebDriver with better error handling
+        try:
+            # Try with ChromeDriverManager first
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        except Exception as e:
+            print(f"DEBUG: ChromeDriverManager failed: {e}")
+            try:
+                # Fallback to system chromedriver
+                service = Service('/usr/bin/chromedriver')
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+            except Exception as e2:
+                print(f"DEBUG: System chromedriver failed: {e2}")
+                # Final fallback - let selenium find chromedriver
+                driver = webdriver.Chrome(options=chrome_options)
         
         if progress_callback:
             progress_callback("Browser initialized successfully...")
             
-        # --- Core Scraping Logic Starts Here (Moved from the except block) ---
+        # Test browser functionality
+        try:
+            driver.get("about:blank")
+            print(f"DEBUG: Browser test successful")
+        except Exception as e:
+            print(f"DEBUG: Browser test failed: {e}")
+            raise Exception(f"Browser initialization failed: {e}")
+            
+        # --- Core Scraping Logic Starts Here ---
         if progress_callback:
             progress_callback("Connecting to portal...")
         
@@ -857,6 +907,8 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
             error_msg = "Login failed. Please check your username and birth date."
         elif "No valid subject rows found" in str(e) or "Could not find any marks" in str(e):
             error_msg = "Could not retrieve marks for the selected semester. Data might not be available or page structure changed."
+        elif "Browser initialization failed" in str(e):
+            error_msg = "Browser setup failed. Please try again later."
         else:
             error_msg = f"An unexpected error occurred during automation: {str(e)}. The portal might be down or its structure changed."
             
