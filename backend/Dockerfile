@@ -56,4 +56,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:${PORT:-8000}/health || exit 1
 
 # Command optimized for both Render and Railway
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 300 --keep-alive 5 --max-requests 100 --preload --access-logfile - --error-logfile - --log-level info all:app"]
+# CHANGE THIS LINE
+# CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers 1 --timeout 300 --keep-alive 5 --max-requests 100 --preload --access-logfile - --error-logfile - --log-level info all:app"]
+# TO THIS
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:${PORT:-8000}", "--timeout", "300", "--keep-alive", "5", "--max-requests", "100", "--preload", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "info", "all:app"]
