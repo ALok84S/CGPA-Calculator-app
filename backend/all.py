@@ -16,13 +16,74 @@ from selenium.webdriver.support.ui import WebDriverWait, Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+# from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeType
+# from webdriver_manager.chrome import ChromeType
 
 app = Flask(__name__)
 CORS(app)  # allow frontend on Vercel to talk to backend
 app.secret_key = os.urandom(24)
+
+# ADD THE BROWSER SETUP CHECK HERE - RIGHT AFTER APP INITIALIZATION
+def check_browser_setup():
+    """Check if Chrome and ChromeDriver are properly installed for containerized environments."""
+    chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+    chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+    
+    print("=" * 50)
+    print("BROWSER SETUP CHECK")
+    print("=" * 50)
+    
+    if not os.path.exists(chrome_bin):
+        print(f"⚠️  WARNING: Chrome binary not found at {chrome_bin}")
+        # Check alternative locations
+        alternative_locations = ["/usr/bin/google-chrome", "/usr/bin/chrome", "/usr/bin/chromium-browser"]
+        for alt in alternative_locations:
+            if os.path.exists(alt):
+                print(f"✅ Found Chrome at alternative location: {alt}")
+                os.environ["CHROME_BIN"] = alt
+                chrome_bin = alt
+                break
+    else:
+        print(f"✅ Chrome binary found: {chrome_bin}")
+    
+    if not os.path.exists(chromedriver_path):
+        print(f"⚠️  WARNING: ChromeDriver not found at {chromedriver_path}")
+        # Check alternative locations
+        alternative_locations = ["/usr/local/bin/chromedriver", "/opt/chromedriver/chromedriver"]
+        for alt in alternative_locations:
+            if os.path.exists(alt):
+                print(f"✅ Found ChromeDriver at alternative location: {alt}")
+                os.environ["CHROMEDRIVER_PATH"] = alt
+                chromedriver_path = alt
+                break
+    else:
+        print(f"✅ ChromeDriver found: {chromedriver_path}")
+    
+    # Test if ChromeDriver is executable
+    try:
+        import stat
+        if os.path.exists(chromedriver_path):
+            file_stat = os.stat(chromedriver_path)
+            if file_stat.st_mode & stat.S_IEXEC:
+                print(f"✅ ChromeDriver is executable")
+            else:
+                print(f"⚠️  ChromeDriver exists but is not executable")
+    except Exception as e:
+        print(f"⚠️  Could not check ChromeDriver permissions: {e}")
+    
+    print(f"📍 Final Chrome binary: {chrome_bin}")
+    print(f"📍 Final ChromeDriver: {chromedriver_path}")
+    print("=" * 50)
+    
+    return chrome_bin, chromedriver_path
+
+# CALL THE CHECK FUNCTION RIGHT HERE
+try:
+    check_browser_setup()
+    print("🚀 Browser setup check completed")
+except Exception as e:
+    print(f"❌ Browser setup check failed: {e}")
 
 # --- CGPA Calculation Functions ---
 # Mechanical Engineering (ME) CGPA Calculations
@@ -552,7 +613,8 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     student_marks = {}
     
     chrome_options = Options()
-    # Essential Chrome options for Docker environment
+    
+    # Essential options for containerized deployment
     chrome_options.add_argument('--headless=new')
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--disable-dev-shm-usage')
@@ -561,34 +623,33 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
     chrome_options.add_argument('--disable-extensions')
     chrome_options.add_argument('--disable-plugins')
     chrome_options.add_argument('--disable-images')
-    # Disabling JavaScript might break the portal's functionality
-    # chrome_options.add_argument('--disable-javascript')
-    chrome_options.add_argument('--disable-plugins-discovery')
-    chrome_options.add_argument('--no-first-run')
-    chrome_options.add_argument('--no-default-browser-check')
-    chrome_options.add_argument('--disable-default-apps')
-    chrome_options.add_argument('--disable-popup-blocking')
-    chrome_options.add_argument('--disable-translate')
-    chrome_options.add_argument('--disable-background-timer-throttling')
-    chrome_options.add_argument('--disable-renderer-backgrounding')
-    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
-    chrome_options.add_argument('--disable-client-side-phishing-detection')
-    chrome_options.add_argument('--disable-sync')
-    chrome_options.add_argument('--metrics-recording-only')
-    chrome_options.add_argument('--no-report-upload')
-    chrome_options.add_argument('--disable-crash-reporter')
-    chrome_options.add_argument('--disable-in-process-stack-traces')
     chrome_options.add_argument('--disable-logging')
     chrome_options.add_argument('--disable-dev-tools')
+    chrome_options.add_argument('--disable-crash-reporter')
+    chrome_options.add_argument('--disable-background-timer-throttling')
+    chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+    chrome_options.add_argument('--disable-renderer-backgrounding')
+    chrome_options.add_argument('--disable-features=TranslateUI')
+    chrome_options.add_argument('--disable-ipc-flooding-protection')
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--start-maximized')
+    chrome_options.add_argument('--remote-debugging-port=9222')
     
-    # Set binary location
-    # This should be handled by the Dockerfile, but a fallback is good practice
-    chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/google-chrome")
+    # Memory and performance optimizations for Railway/Render
+    chrome_options.add_argument('--memory-pressure-off')
+    chrome_options.add_argument('--max-old-space-size=512')
+    chrome_options.add_argument('--single-process')  # Use with caution - may help with memory
+    
+    # Set Chrome binary path for containerized environments
+    chrome_options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
     
     chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_experimental_option("prefs", {
+        "profile.default_content_setting_values.notifications": 2,
+        "profile.default_content_settings.popups": 0,
+        "profile.managed_default_content_settings.images": 2
+    })
     
     driver = None
     
@@ -596,346 +657,419 @@ def get_marks_from_portal(username, birth_day, birth_month, birth_year, semester
         if progress_callback:
             progress_callback("Initializing browser...")
         
-        # Initialize WebDriver with better error handling
+        # Simplified driver initialization for containers
         try:
-            # Try with ChromeDriverManager first
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-        except Exception as e:
-            print(f"DEBUG: ChromeDriverManager failed: {e}")
-            try:
-                # Fallback to system chromedriver
-                service = Service('/usr/bin/chromedriver')
+            # For containerized environments, use system chromedriver
+            chromedriver_path = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+            if os.path.exists(chromedriver_path):
+                service = Service(chromedriver_path)
                 driver = webdriver.Chrome(service=service, options=chrome_options)
-            except Exception as e2:
-                print(f"DEBUG: System chromedriver failed: {e2}")
-                # Final fallback - let selenium find chromedriver
-                driver = webdriver.Chrome(options=chrome_options)
+                print(f"DEBUG: Using system chromedriver: {chromedriver_path}")
+            else:
+                # Fallback to ChromeDriverManager
+                # service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                print(f"DEBUG: Using ChromeDriverManager")
+                
+        except Exception as e:
+            print(f"DEBUG: ChromeDriver initialization failed: {e}")
+            # Final fallback - let selenium find chromedriver
+            driver = webdriver.Chrome(options=chrome_options)
+        
+        # Set timeouts
+        driver.set_page_load_timeout(30)
+        driver.implicitly_wait(10)
         
         if progress_callback:
             progress_callback("Browser initialized successfully...")
             
-        # Test browser functionality
-        try:
-            driver.get("about:blank")
-            print(f"DEBUG: Browser test successful")
-        except Exception as e:
-            print(f"DEBUG: Browser test failed: {e}")
-            raise Exception(f"Browser initialization failed: {e}")
+        # Test browser functionality with retry mechanism
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                driver.get("about:blank")
+                print(f"DEBUG: Browser test successful on attempt {attempt + 1}")
+                break
+            except Exception as e:
+                print(f"DEBUG: Browser test failed on attempt {attempt + 1}: {e}")
+                if attempt == max_retries - 1:
+                    raise Exception(f"Browser initialization failed after {max_retries} attempts: {e}")
+                time.sleep(2)
             
-        # --- Core Scraping Logic Starts Here ---
+        # Navigate to login page with retry
         if progress_callback:
             progress_callback("Connecting to portal...")
         
-        driver.get(LOGIN_URL)
+        for attempt in range(3):
+            try:
+                driver.get(LOGIN_URL)
+                break
+            except Exception as e:
+                print(f"DEBUG: Failed to load login page on attempt {attempt + 1}: {e}")
+                if attempt == 2:
+                    raise Exception(f"Could not load portal page: {e}")
+                time.sleep(3)
         
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "username"))
-        )
+        # Wait for login form with better error handling
+        try:
+            username_field = WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.ID, "username"))
+            )
+        except TimeoutException:
+            # Try alternative selectors
+            try:
+                username_field = WebDriverWait(driver, 5).until(
+                    EC.presence_of_element_located((By.NAME, "username"))
+                )
+            except TimeoutException:
+                raise Exception("Could not find username field. Portal might be down or structure changed.")
         
         if progress_callback:
-            progress_callback("Processing...")
+            progress_callback("Filling login form...")
         
-        driver.find_element(By.ID, "username").send_keys(username)
-        driver.find_element(By.ID, "dd").send_keys(birth_day)
+        # Fill login form with error handling
+        try:
+            username_field.clear()
+            username_field.send_keys(username)
+            
+            day_field = driver.find_element(By.ID, "dd")
+            day_field.clear()
+            day_field.send_keys(birth_day)
+            
+            month_dropdown = Select(driver.find_element(By.ID, "mm"))
+            month_dropdown.select_by_value(birth_month)
+            
+            year_field = driver.find_element(By.ID, "yyyy")
+            year_field.clear()
+            year_field.send_keys(birth_year)
+            
+        except Exception as e:
+            raise Exception(f"Failed to fill login form: {e}")
         
-        month_dropdown = Select(driver.find_element(By.ID, "mm"))
-        month_dropdown.select_by_value(birth_month)
-        
-        driver.find_element(By.ID, "yyyy").send_keys(birth_year)
-        
-        time.sleep(0.5)
+        time.sleep(1)  # Brief pause before clicking login
 
+        # Enhanced login button detection and clicking
         login_success = False
-        login_attempts = [
+        login_selectors = [
             (By.XPATH, "//input[@type='submit']"),
-            (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In')]"),
-            (By.XPATH, "//button | //input[@type='button']")
+            (By.XPATH, "//button[contains(text(), 'Login') or contains(text(), 'Sign In') or contains(@class, 'login')]"),
+            (By.XPATH, "//input[@value='Login' or @value='Sign In']"),
+            (By.CSS_SELECTOR, "button[type='submit']"),
+            (By.CSS_SELECTOR, "input[type='submit']")
         ]
         
-        for attempt, selector in enumerate(login_attempts):
+        for i, selector in enumerate(login_selectors):
             if login_success:
                 break
             try:
                 if progress_callback:
-                    progress_callback(f"Verifying...")
+                    progress_callback(f"Attempting login... (method {i+1})")
                 
                 login_button = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable(selector)
                 )
                 
+                # Scroll to button and click
+                driver.execute_script("arguments[0].scrollIntoView(true);", login_button)
+                time.sleep(0.5)
+                
                 try:
                     login_button.click()
-                    login_success = True
-                except WebDriverException as click_error:
-                    if "element click intercepted" in str(click_error):
-                        if progress_callback:
-                            progress_callback("Login button click intercepted, using JavaScript...")
-                        driver.execute_script("arguments[0].click();", login_button)
-                        login_success = True
-                    else:
-                        raise click_error
-                        
+                except WebDriverException:
+                    # JavaScript click as fallback
+                    driver.execute_script("arguments[0].click();", login_button)
+                
+                login_success = True
+                print(f"DEBUG: Successfully clicked login button using selector {i+1}")
+                
             except TimeoutException:
+                print(f"DEBUG: Login selector {i+1} not found")
+                continue
+            except Exception as e:
+                print(f"DEBUG: Login selector {i+1} failed: {e}")
                 continue
         
         if not login_success:
-            raise Exception("Could not find any clickable login button after all attempts.")
+            raise Exception("Could not find or click any login button.")
 
+        # Wait for navigation with better detection
         if progress_callback:
-            progress_callback("Waiting for dashboard to load...")
+            progress_callback("Logging in...")
         
-        WebDriverWait(driver, 20).until(
-            EC.url_changes(LOGIN_URL) or EC.presence_of_element_located((By.ID, "dashboardMainContent")) 
-        )
+        try:
+            # Wait for either URL change or dashboard elements
+            WebDriverWait(driver, 20).until(
+                lambda driver: (
+                    driver.current_url != LOGIN_URL or
+                    len(driver.find_elements(By.CSS_SELECTOR, "div.uk-card, .dashboard, #dashboard")) > 0
+                )
+            )
+        except TimeoutException:
+            # Check for login errors
+            error_indicators = [
+                "Invalid Username",
+                "Incorrect",
+                "Authentication failed",
+                "Login failed",
+                "Wrong credentials"
+            ]
+            
+            page_text = driver.page_source.lower()
+            for error in error_indicators:
+                if error.lower() in page_text:
+                    raise Exception(f"Login failed: {error}")
+            
+            raise Exception("Login process timed out. Portal might be slow or credentials incorrect.")
         
         dashboard_url = driver.current_url
         print(f"DEBUG: Dashboard URL: {dashboard_url}")
         
-        try:
-            error_message_element = driver.find_element(By.XPATH, "//*[contains(text(), 'Invalid Username') or contains(text(), 'Incorrect') or contains(text(), 'Authentication failed')]")
-            if error_message_element.is_displayed():
-                raise Exception(f"Login failed: {error_message_element.text}")
-        except NoSuchElementException:
-            pass
-
         if progress_callback:
             progress_callback("Finding subjects...")
 
-        MAIN_SUBJECT_CONTAINER_SELECTOR = "div.uk-card.uk-card-body.cn-pad-20.cn-fee-head" 
+        # Enhanced subject container detection
+        subject_container_selectors = [
+            "div.uk-card.uk-card-body.cn-pad-20.cn-fee-head",
+            "div.uk-card",
+            ".marks-container",
+            ".subject-container",
+            "div[class*='card']"
+        ]
         
-        subject_list_container = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
-        )
+        subject_list_container = None
+        for selector in subject_container_selectors:
+            try:
+                subject_list_container = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                )
+                print(f"DEBUG: Found subject container using: {selector}")
+                break
+            except TimeoutException:
+                continue
+        
+        if not subject_list_container:
+            raise Exception("Could not find subject list container. Portal structure might have changed.")
 
-        subjects_table = WebDriverWait(subject_list_container, 5).until(
-            EC.presence_of_element_located((By.TAG_NAME, "table"))
-        )
+        # Find subjects table
+        try:
+            subjects_table = subject_list_container.find_element(By.TAG_NAME, "table")
+        except:
+            # Look for table anywhere on page
+            tables = driver.find_elements(By.TAG_NAME, "table")
+            if not tables:
+                raise Exception("No tables found on the page.")
+            subjects_table = tables[0]  # Use first table as fallback
 
+        # Get subject rows with better error handling
         subject_rows = []
         try:
-            tbody = WebDriverWait(subjects_table, 5).until(
-                EC.presence_of_element_located((By.TAG_NAME, "tbody"))
-            )
+            tbody = subjects_table.find_element(By.TAG_NAME, "tbody")
             all_trs = tbody.find_elements(By.TAG_NAME, "tr")
-            subject_rows = [row for row in all_trs if len(row.find_elements(By.TAG_NAME, "td")) >= 2]
-        except TimeoutException:
+        except:
             all_trs = subjects_table.find_elements(By.TAG_NAME, "tr")
-            subject_rows = [row for row in all_trs if len(row.find_elements(By.TAG_NAME, "td")) >= 2]
+        
+        # Filter valid subject rows
+        for row in all_trs:
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if len(cells) >= 2:  # Must have at least 2 columns
+                subject_rows.append(row)
 
         if not subject_rows:
-            raise Exception("No valid subject rows found in the marks table.")
+            raise Exception("No valid subject rows found. Check if marks are available for the selected semester.")
 
         total_subjects = len(subject_rows)
         print(f"DEBUG: Found {total_subjects} subjects")
         
+        # Process each subject with enhanced error recovery
         for i, subject_row in enumerate(subject_rows):
             try:
                 if progress_callback:
                     progress_callback(f"Processing subject {i+1} of {total_subjects}...")
                 
-                print(f"DEBUG: Starting subject {i+1}")
-                print(f"DEBUG: Current URL before processing: {driver.current_url}")
+                # Get subject details
+                cells = subject_row.find_elements(By.TAG_NAME, "td")
+                course_code = cells[0].text.strip()
+                raw_subject_name = cells[1].text.strip()
                 
-                subject_code_element = WebDriverWait(subject_row, 2).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "td:nth-child(1)"))
-                )
-                course_code = subject_code_element.text.strip()
-
-                subject_name_element = WebDriverWait(subject_row, 2).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "td:nth-child(2)"))
-                )
-                raw_subject_name = subject_name_element.text.strip()
-
                 print(f"DEBUG: Processing {raw_subject_name} ({course_code})")
                 
                 subject_key = map_subject_name(course_code, raw_subject_name, semester, branch)
                 
                 if not subject_key:
-                    print(f"DEBUG: Skipping unknown subject: {raw_subject_name} ({course_code})")
-                    if progress_callback:
-                        progress_callback(f"Skipping unknown subject: {raw_subject_name} ({course_code})")
+                    print(f"DEBUG: Skipping unknown subject: {raw_subject_name}")
                     continue
 
-                print(f"DEBUG: Looking for CIE button for {subject_key}")
-
-                cie_button_selectors = [
+                # Find and click CIE button with multiple strategies
+                cie_selectors = [
                     ".//a[./button[contains(@class, 'cn-cieclr') and text()='CIE']]",
                     ".//button[contains(@class, 'cn-cieclr') and text()='CIE']",
                     ".//a[contains(text(), 'CIE')]",
                     ".//button[contains(text(), 'CIE')]",
-                    ".//a[.//*[text()='CIE']]"
+                    ".//a[.//*[text()='CIE']]",
+                    ".//a[contains(@href, 'cie') or contains(@href, 'CIE')]"
                 ]
                 
-                cie_link_element = None
-                for selector in cie_button_selectors:
+                cie_element = None
+                for selector in cie_selectors:
                     try:
-                        cie_link_element = WebDriverWait(subject_row, 2).until(
-                            EC.element_to_be_clickable((By.XPATH, selector))
-                        )
-                        print(f"DEBUG: Found CIE button using selector: {selector}")
-                        break
-                    except TimeoutException:
+                        cie_element = subject_row.find_element(By.XPATH, selector)
+                        if cie_element.is_enabled() and cie_element.is_displayed():
+                            break
+                    except:
                         continue
                 
-                if not cie_link_element:
+                if not cie_element:
                     print(f"DEBUG: No CIE button found for {subject_key}")
-                    all_links = subject_row.find_elements(By.TAG_NAME, "a")
-                    all_buttons = subject_row.find_elements(By.TAG_NAME, "button")
-                    print(f"DEBUG: Found {len(all_links)} links and {len(all_buttons)} buttons in row")
-                    
-                    for j, link in enumerate(all_links):
-                        print(f"DEBUG: Link {j+1}: text='{link.text}', class='{link.get_attribute('class')}'")
-                    for j, button in enumerate(all_buttons):
-                        print(f"DEBUG: Button {j+1}: text='{button.text}', class='{button.get_attribute('class')}'")
-                    
                     student_marks[subject_key] = 0.0
                     continue
                 
-                print(f"DEBUG: Attempting to click CIE for: {subject_key}")
-                
-                try:
-                    driver.execute_script("arguments[0].scrollIntoView(true);", cie_link_element)
-                    time.sleep(0.5)
-                    print(f"DEBUG: Scrolled to CIE button")
-                    
-                    cie_link_element.click()
-                    print(f"DEBUG: Clicked CIE button")
-                    
-                except WebDriverException as click_error:
-                    print(f"DEBUG: Click intercepted, trying JavaScript click")
-                    if "element click intercepted" in str(click_error):
-                        driver.execute_script("arguments[0].click();", cie_link_element)
-                        print(f"DEBUG: JavaScript click executed")
-                    else:
-                        raise click_error
+                # Click CIE button with retry
+                click_success = False
+                for attempt in range(3):
+                    try:
+                        driver.execute_script("arguments[0].scrollIntoView(true);", cie_element)
+                        time.sleep(0.5)
+                        
+                        try:
+                            cie_element.click()
+                        except WebDriverException:
+                            driver.execute_script("arguments[0].click();", cie_element)
+                        
+                        click_success = True
+                        break
+                        
+                    except Exception as e:
+                        print(f"DEBUG: CIE click attempt {attempt + 1} failed: {e}")
+                        if attempt < 2:
+                            time.sleep(1)
 
-                print(f"DEBUG: Waiting for marks page to load...")
-                
-                marks_page_loaded = False
+                if not click_success:
+                    print(f"DEBUG: Could not click CIE for {subject_key}")
+                    student_marks[subject_key] = 0.0
+                    continue
+
+                # Wait for marks page with timeout
+                marks_loaded = False
                 wait_strategies = [
-                    (By.XPATH, f"//caption[contains(text(), '{re.escape(course_code)}') or contains(text(), '{re.escape(raw_subject_name)}')]"),
-                    (By.XPATH, "//table[contains(@class, 'marks') or contains(@class, 'result')]"),
                     (By.XPATH, "//table//th[contains(text(), 'Marks') or contains(text(), 'Score')]"),
+                    (By.XPATH, "//table[contains(@class, 'marks') or contains(@class, 'result')]"),
                     (By.XPATH, "//table")
                 ]
                 
                 for strategy in wait_strategies:
                     try:
                         WebDriverWait(driver, 10).until(EC.presence_of_element_located(strategy))
-                        marks_page_loaded = True
-                        print(f"DEBUG: Marks page loaded using strategy: {strategy}")
+                        marks_loaded = True
                         break
                     except TimeoutException:
                         continue
                 
-                if not marks_page_loaded:
-                    print(f"DEBUG: Could not confirm marks page loaded for {subject_key}")
-                    print(f"DEBUG: Current URL after click: {driver.current_url}")
-                    print(f"DEBUG: Page title: {driver.title}")
-                    
-                    page_source_snippet = driver.page_source[:1000]
-                    print(f"DEBUG: Page source snippet: {page_source_snippet}")
-
-                print(f"DEBUG: Current URL after navigation: {driver.current_url}")
-
-                raw_marks_strings = extract_marks_from_page_debug(driver)
-                print(f"DEBUG: Raw marks extracted for {subject_key}: {raw_marks_strings}")
-                
-                if not raw_marks_strings:
+                if not marks_loaded:
+                    print(f"DEBUG: Marks page did not load for {subject_key}")
                     student_marks[subject_key] = 0.0
-                    print(f"DEBUG: No marks found for {raw_subject_name}, assigning 0.")
-                    if progress_callback:
-                        progress_callback(f"No marks found for {raw_subject_name}, assigning 0.")
                 else:
-                    component_marks = [parse_mark_string(s) for s in raw_marks_strings]
-                    print(f"DEBUG: Component marks: {component_marks}")
-                    calculated_mark = calculate_subject_mark(subject_key, component_marks, semester, branch)
-                    student_marks[subject_key] = calculated_mark
-                    print(f"DEBUG: Final calculated mark for {subject_key}: {calculated_mark}")
+                    # Extract marks with improved error handling
+                    raw_marks_strings = extract_marks_from_page_debug(driver)
+                    
+                    if not raw_marks_strings:
+                        student_marks[subject_key] = 0.0
+                    else:
+                        component_marks = [parse_mark_string(s) for s in raw_marks_strings]
+                        calculated_mark = calculate_subject_mark(subject_key, component_marks, semester, branch)
+                        student_marks[subject_key] = calculated_mark
 
-                print(f"DEBUG: Returning to dashboard...")
-                driver.back()
-                
-                try:
-                    WebDriverWait(driver, 15).until(
-                        EC.url_to_be(dashboard_url) or EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
-                    )
-                    print(f"DEBUG: Successfully returned to dashboard")
-                except TimeoutException:
-                    print(f"DEBUG: Timeout returning to dashboard, current URL: {driver.current_url}")
-                    driver.get(dashboard_url)
-                    WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
-                    )
-                    print(f"DEBUG: Manually navigated back to dashboard")
+                # Return to dashboard with retry
+                return_success = False
+                for attempt in range(3):
+                    try:
+                        driver.back()
+                        WebDriverWait(driver, 15).until(
+                            lambda d: dashboard_url in d.current_url or
+                            len(d.find_elements(By.CSS_SELECTOR, "div.uk-card, .dashboard")) > 0
+                        )
+                        return_success = True
+                        break
+                    except:
+                        if attempt < 2:
+                            print(f"DEBUG: Return attempt {attempt + 1} failed, trying direct navigation")
+                            driver.get(dashboard_url)
+                            time.sleep(2)
 
-                print(f"DEBUG: Completed subject {i+1}: {subject_key}")
+                if not return_success:
+                    print(f"DEBUG: Could not return to dashboard after {subject_key}")
+                    break  # Stop processing if we can't navigate back
 
             except Exception as e:
-                print(f"DEBUG: Exception for subject {raw_subject_name or course_code}: {str(e)}")
-                print(f"DEBUG: Exception type: {type(e).__name__}")
-                import traceback
-                traceback.print_exc()
+                print(f"DEBUG: Error processing subject {i+1}: {e}")
+                student_marks[subject_key if 'subject_key' in locals() else f"subject_{i+1}"] = 0.0
                 
-                if progress_callback:
-                    progress_callback(f"Error processing subject {raw_subject_name or course_code}: {str(e)}. Attempting to return to dashboard.")
-                
-                try: 
-                    print(f"DEBUG: Attempting to return to dashboard after error")
+                # Try to return to dashboard
+                try:
                     driver.back()
-                    WebDriverWait(driver, 10).until(
-                        EC.url_to_be(dashboard_url) or EC.presence_of_element_located((By.CSS_SELECTOR, MAIN_SUBJECT_CONTAINER_SELECTOR))
-                    )
-                    print(f"DEBUG: Successfully returned to dashboard after error")
-                except Exception as return_error:
-                    print(f"DEBUG: Failed to return to dashboard: {return_error}")
-                    if progress_callback:
-                        progress_callback("Failed to return to dashboard after error. Automation might be unstable.")
-                    break
-                    
+                    time.sleep(2)
+                except:
+                    pass
+                
         if progress_callback:
-            progress_callback("Marks extraction completed successfully!")
+            progress_callback("Marks extraction completed!")
 
     except Exception as e:
         print(f"DEBUG: Main exception: {str(e)}")
         import traceback
         traceback.print_exc()
         
-        error_msg = f"Automation failed: {str(e)}"
-        if "Authentication failed" in str(e) or "Invalid credentials" in str(e) or "Could not find any clickable login button" in str(e):
-            error_msg = "Login failed. Please check your username and birth date."
-        elif "No valid subject rows found" in str(e) or "Could not find any marks" in str(e):
-            error_msg = "Could not retrieve marks for the selected semester. Data might not be available or page structure changed."
-        elif "Browser initialization failed" in str(e):
-            error_msg = "Browser setup failed. Please try again later."
-        else:
-            error_msg = f"An unexpected error occurred during automation: {str(e)}. The portal might be down or its structure changed."
+        # Better error messages
+        error_msg = str(e)
+        if "Could not load portal page" in error_msg or "timed out" in error_msg.lower():
+            error_msg = "Portal is not accessible. Please try again later."
+        elif "Could not find username field" in error_msg:
+            error_msg = "Portal login page has changed. Please contact support."
+        elif "Login failed" in error_msg or "credentials" in error_msg.lower():
+            error_msg = "Invalid credentials. Please check your username and birth date."
+        elif "No valid subject rows found" in error_msg:
+            error_msg = "No marks found for the selected semester. Data might not be available yet."
+        elif "Browser initialization failed" in error_msg:
+            error_msg = "System error. Please try again."
             
         if progress_callback:
             progress_callback(error_msg)
         raise Exception(error_msg)
+        
     finally:
+        # Enhanced cleanup
         if driver:
             try:
                 if progress_callback:
-                    progress_callback("Calculating...")
-                print(f"DEBUG: Cleaning up browser...")
+                    progress_callback("Cleaning up...")
+                
+                # Try to logout
                 try:
-                    logout_element = WebDriverWait(driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), 'Logout') or contains(text(), 'Log Out')] | //button[contains(text(), 'Logout')]"))
-                    )
-                    logout_element.click()
-                    time.sleep(1)
-                    print(f"DEBUG: Logged out successfully")
-                except:
-                    print(f"DEBUG: Could not find logout button")
-                    pass
+                    logout_selectors = [
+                        "//a[contains(text(), 'Logout') or contains(text(), 'Log Out')]",
+                        "//button[contains(text(), 'Logout')]",
+                        "//a[contains(@href, 'logout')]"
+                    ]
+                    
+                    for selector in logout_selectors:
+                        try:
+                            logout_element = driver.find_element(By.XPATH, selector)
+                            logout_element.click()
+                            time.sleep(1)
+                            break
+                        except:
+                            continue
+                            
+                except Exception as e:
+                    print(f"DEBUG: Logout failed: {e}")
+                    
             except:
                 pass
             finally:
-                driver.quit()
-                print(f"DEBUG: Browser closed")
+                try:
+                    driver.quit()
+                    print(f"DEBUG: Browser closed successfully")
+                except:
+                    print(f"DEBUG: Error closing browser")
 
     return student_marks
 
